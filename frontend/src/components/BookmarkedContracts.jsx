@@ -1,3 +1,5 @@
+import { exportToCsv } from '../api/client';
+
 function formatDollars(amount) {
   if (amount == null) return 'N/A';
   const n = Number(amount);
@@ -15,7 +17,7 @@ function daysUntil(dateStr) {
   return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
 }
 
-export default function BookmarkedContracts({ bookmarks, onToggleBookmark, onClear }) {
+export default function BookmarkedContracts({ bookmarks, onToggleBookmark, onClear, selectedPiid, onSelectContract }) {
   if (bookmarks.length === 0) {
     return (
       <div className="no-results">
@@ -28,7 +30,10 @@ export default function BookmarkedContracts({ bookmarks, onToggleBookmark, onCle
     <div className="results">
       <div className="results-header">
         <span>{bookmarks.length} bookmarked contract{bookmarks.length !== 1 ? 's' : ''}</span>
-        <button className="secondary" onClick={onClear}>Clear All</button>
+        <div className="results-actions">
+          <button className="secondary" onClick={() => exportToCsv(bookmarks, 'bbs-bookmarked-contracts.csv')}>Export CSV</button>
+          <button className="secondary" onClick={onClear}>Clear All</button>
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -38,6 +43,7 @@ export default function BookmarkedContracts({ bookmarks, onToggleBookmark, onCle
               <th></th>
               <th>Recipient</th>
               <th>Agency</th>
+              <th>Sub-Agency</th>
               <th>Amount</th>
               <th>Description</th>
               <th>Set-Aside</th>
@@ -52,11 +58,19 @@ export default function BookmarkedContracts({ bookmarks, onToggleBookmark, onCle
               const days = daysUntil(row['End Date']);
               const expiring = days != null && days > 0 && days <= 180;
               return (
-                <tr key={row['Award ID'] || i} className={expiring ? 'expiring' : ''}>
+                <tr
+                  key={row['Award ID'] || i}
+                  className={[
+                    expiring ? 'expiring' : '',
+                    'clickable',
+                    selectedPiid === row['Award ID'] ? 'selected' : '',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => onSelectContract?.(row['Award ID'])}
+                >
                   <td>
                     <button
                       className="bookmark-btn bookmarked"
-                      onClick={() => onToggleBookmark(row)}
+                      onClick={(e) => { e.stopPropagation(); onToggleBookmark(row); }}
                       title="Remove bookmark"
                     >
                       {'\u2605'}
@@ -64,6 +78,7 @@ export default function BookmarkedContracts({ bookmarks, onToggleBookmark, onCle
                   </td>
                   <td className="recipient">{row['Recipient Name'] || '\u2014'}</td>
                   <td>{row['Awarding Agency'] || '\u2014'}</td>
+                  <td className="office">{row['Awarding Sub Agency'] || '\u2014'}</td>
                   <td className="amount">{formatDollars(row['Award Amount'])}</td>
                   <td className="description">{row['Description']?.slice(0, 120) || '\u2014'}</td>
                   <td>{row['Type of Set Aside'] || '\u2014'}</td>

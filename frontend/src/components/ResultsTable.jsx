@@ -1,3 +1,5 @@
+import { exportToCsv } from '../api/client';
+
 function formatDollars(amount) {
   if (amount == null) return 'N/A';
   const n = Number(amount);
@@ -15,7 +17,7 @@ function daysUntil(dateStr) {
   return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
 }
 
-export default function ResultsTable({ data, hasNext, page, onPageChange, onToggleBookmark, isBookmarked }) {
+export default function ResultsTable({ data, hasNext, page, onPageChange, onToggleBookmark, isBookmarked, selectedPiid, onSelectContract }) {
   if (!data) return null;
 
   if (data.length === 0) {
@@ -26,10 +28,13 @@ export default function ResultsTable({ data, hasNext, page, onPageChange, onTogg
     <div className="results">
       <div className="results-header">
         <span>Showing {data.length} contracts{hasNext ? ' (more available)' : ''}</span>
-        <div className="pagination">
-          <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Prev</button>
-          <span>Page {page}</span>
-          <button disabled={!hasNext} onClick={() => onPageChange(page + 1)}>Next</button>
+        <div className="results-actions">
+          <button className="secondary" onClick={() => exportToCsv(data)}>Export CSV</button>
+          <div className="pagination">
+            <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Prev</button>
+            <span>Page {page}</span>
+            <button disabled={!hasNext} onClick={() => onPageChange(page + 1)}>Next</button>
+          </div>
         </div>
       </div>
 
@@ -40,6 +45,7 @@ export default function ResultsTable({ data, hasNext, page, onPageChange, onTogg
               <th></th>
               <th>Recipient</th>
               <th>Agency</th>
+              <th>Sub-Agency</th>
               <th>Amount</th>
               <th>Description</th>
               <th>Set-Aside</th>
@@ -55,11 +61,19 @@ export default function ResultsTable({ data, hasNext, page, onPageChange, onTogg
               const expiring = days != null && days > 0 && days <= 180;
               const saved = isBookmarked?.(row['Award ID']);
               return (
-                <tr key={row['Award ID'] || i} className={expiring ? 'expiring' : ''}>
+                <tr
+                  key={row['Award ID'] || i}
+                  className={[
+                    expiring ? 'expiring' : '',
+                    'clickable',
+                    selectedPiid === row['Award ID'] ? 'selected' : '',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => onSelectContract?.(row['Award ID'])}
+                >
                   <td>
                     <button
                       className={`bookmark-btn ${saved ? 'bookmarked' : ''}`}
-                      onClick={() => onToggleBookmark?.(row)}
+                      onClick={(e) => { e.stopPropagation(); onToggleBookmark?.(row); }}
                       title={saved ? 'Remove bookmark' : 'Bookmark this contract'}
                     >
                       {saved ? '\u2605' : '\u2606'}
@@ -67,6 +81,7 @@ export default function ResultsTable({ data, hasNext, page, onPageChange, onTogg
                   </td>
                   <td className="recipient">{row['Recipient Name'] || '\u2014'}</td>
                   <td>{row['Awarding Agency'] || '\u2014'}</td>
+                  <td className="office">{row['Awarding Sub Agency'] || '\u2014'}</td>
                   <td className="amount">{formatDollars(row['Award Amount'])}</td>
                   <td className="description">{row['Description']?.slice(0, 120) || '\u2014'}</td>
                   <td>{row['Type of Set Aside'] || '\u2014'}</td>

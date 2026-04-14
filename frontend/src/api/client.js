@@ -36,3 +36,46 @@ export async function getReferenceData() {
   if (!res.ok) throw new Error(`Reference data failed: ${res.status}`);
   return res.json();
 }
+
+export function exportToCsv(data, filename = 'bbs-contracts.csv') {
+  if (!data || data.length === 0) return;
+
+  const columns = [
+    'Award ID', 'Recipient Name', 'Awarding Agency', 'Awarding Sub Agency',
+    'Awarding Office Name', 'Award Amount', 'Description', 'Type of Set Aside',
+    'Start Date', 'End Date', 'Contract Award Type', 'Place of Performance State Code',
+    'Recipient UEI',
+  ];
+
+  const escape = (val) => {
+    if (val == null) return '';
+    const s = String(val);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const header = columns.map(escape).join(',');
+  const rows = data.map(row => columns.map(col => escape(row[col])).join(','));
+  const csv = [header, ...rows].join('\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function getContractDetail(piid) {
+  const res = await fetch(`${BASE}/contract-detail?piid=${encodeURIComponent(piid)}`);
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    const body = await res.json().catch(() => null);
+    const detail = body?.detail || `Request failed (${res.status})`;
+    throw new Error(detail);
+  }
+  return res.json();
+}

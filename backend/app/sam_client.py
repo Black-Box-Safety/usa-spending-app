@@ -1,0 +1,186 @@
+"""SAM.gov Contract Awards API client with TTL caching."""
+
+import hashlib
+import json
+import os
+import time
+
+import requests
+
+SAM_BASE_URL = "https://api.sam.gov/contract-awards/v1/search"
+CACHE_TTL = 3600  # 1 hour
+MAX_CACHE_SIZE = 500
+
+_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _cache_key(params: dict) -> str:
+    raw = json.dumps(params, sort_keys=True)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _get_cached(key: str) -> dict | None:
+    if key in _cache:
+        ts, data = _cache[key]
+        if time.time() - ts < CACHE_TTL:
+            return data
+        del _cache[key]
+    return None
+
+
+def _set_cache(key: str, data: dict):
+    if len(_cache) >= MAX_CACHE_SIZE:
+        oldest = min(_cache, key=lambda k: _cache[k][0])
+        del _cache[oldest]
+    _cache[key] = (time.time(), data)
+
+
+class SAMClient:
+    """Thin wrapper around the SAM.gov Contract Awards API."""
+
+    def __init__(self):
+        self.api_key = os.environ.get("SAM_API_KEY", "")
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "BBS-SpendingSearch/1.0",
+            "Accept": "application/json",
+        })
+
+    def _get(self, params: dict) -> dict:
+        key = _cache_key(params)
+        cached = _get_cached(key)
+        if cached is not None:
+            return cached
+
+        query = {**params, "api_key": self.api_key}
+        r = self.session.get(SAM_BASE_URL, params=query, timeout=20)
+        if r.status_code == 429:
+            raise RuntimeError("SAM.gov rate limit reached. Try again later.")
+        r.raise_for_status()
+        data = r.json()
+        _set_cache(key, data)
+        return data
+
+    def search_by_piid(self, piid: str) -> dict | None:
+        """Look up a contract by its PIID (Award ID).
+
+        Tries the base award (mod 0) first, falls back to latest modification.
+        """
+        # Try base award first
+        base = self._get({
+            "piid": piid,
+            "modificationNumber": "0",
+            "limit": 1,
+        })
+        base_records = base.get("awardSummary", [])
+        if base_records:
+            return self._extract(base_records[0])
+
+        # Fall back to latest modification
+        data = self._get({
+            "piid": piid,
+            "limit": 1,
+        })
+        records = data.get("awardSummary", [])
+        if not records:
+            return None
+
+        return self._extract(records[0])
+
+    @staticmethod
+    def _code_name(obj) -> str | None:
+        """Extract display string from {code, name} objects."""
+        if not obj or not isinstance(obj, dict):
+            return None
+        name = obj.get("name", "").strip()
+        return name if name else obj.get("code")
+
+    def _extract(self, record: dict) -> dict:
+        """Pull the fields we care about from a SAM.gov record."""
+        contract_id = record.get("contractId", {})
+        core = record.get("coreData", {})
+        fed_org = core.get("federalOrganization", {})
+        contracting_info = fed_org.get("contractingInformation", {})
+        award_details = record.get("awardDetails", {})
+        awardee_data = award_details.get("awardeeData", {})
+        awardee_header = awardee_data.get("awardeeHeader", {})
+        awardee_location = awardee_data.get("awardeeLocation", {})
+        awardee_uei = awardee_data.get("awardeeUEIInformation", {})
+        dollars = award_details.get("dollars", {})
+        total_dollars = award_details.get("totalContractDollars", {})
+        competition = core.get("competitionInformation", {})
+        product_info = core.get("productOrServiceInformation", {})
+        product_svc = product_info.get("productOrService", {})
+        naics_list = product_info.get("principalNaics", [])
+        naics = naics_list[0] if naics_list else {}
+        dates = award_details.get("dates", {})
+        transaction = award_details.get("transactionData", {})
+        description_info = award_details.get("productOrServiceInformation", {})
+
+        dept = contracting_info.get("contractingDepartment", {})
+        subtier = contracting_info.get("contractingSubtier", {})
+        office = contracting_info.get("contractingOffice", {})
+
+        # State can be a string or {code, name} object
+        state_raw = awardee_location.get("state", {})
+        awardee_state = state_raw.get("code", "").strip() if isinstance(state_raw, dict) else state_raw
+
+        return {
+            # Contract ID
+            "piid": contract_id.get("piid"),
+            "modification_number": contract_id.get("modificationNumber"),
+
+            # Contracting organization
+            "department_name": dept.get("name"),
+            "department_code": dept.get("code", "").strip(),
+            "subtier_name": subtier.get("name"),
+            "subtier_code": subtier.get("code"),
+            "office_name": office.get("name"),
+            "office_code": office.get("code"),
+            "office_country": office.get("country"),
+
+            # Contracting officer info (from transaction data)
+            "created_by": transaction.get("createdBy"),
+            "approved_by": transaction.get("approvedBy"),
+            "last_modified_by": transaction.get("lastModifiedBy"),
+
+            # Awardee
+            "awardee_name": awardee_header.get("awardeeName"),
+            "awardee_legal_name": awardee_header.get("awardeeNameFromContract"),
+            "awardee_uei": awardee_uei.get("uniqueEntityId"),
+            "awardee_cage": awardee_uei.get("cageCode"),
+            "awardee_parent_name": awardee_uei.get("awardeeUltimateParentName"),
+            "awardee_address": awardee_location.get("streetAddress1"),
+            "awardee_city": awardee_location.get("city"),
+            "awardee_state": awardee_state,
+            "awardee_zip": awardee_location.get("zip"),
+            "awardee_phone": awardee_location.get("phoneNumber"),
+            "awardee_fax": awardee_location.get("faxNumber"),
+
+            # Dollars
+            "action_obligation": dollars.get("actionObligation"),
+            "base_and_options_value": dollars.get("baseAndAllOptionsValue"),
+            "total_obligation": total_dollars.get("totalActionObligation"),
+            "total_base_and_options": total_dollars.get("totalBaseAndAllOptionsValue"),
+
+            # Product/Service
+            "psc_code": product_svc.get("code"),
+            "psc_description": product_svc.get("name"),
+            "naics_code": naics.get("code"),
+            "naics_description": naics.get("name"),
+            "description": description_info.get("descriptionOfContractRequirement"),
+
+            # Competition
+            "set_aside_type": self._code_name(competition.get("typeOfSetAside")),
+            "solicitation_procedures": self._code_name(competition.get("solicitationProcedures")),
+            "extent_competed": self._code_name(competition.get("extentCompeted")),
+
+            # Dates
+            "effective_date": dates.get("periodOfPerformanceStartDate"),
+            "completion_date": dates.get("ultimateCompletionDate"),
+            "signed_date": dates.get("dateSigned"),
+
+            # Place of performance
+            "pop_city": core.get("principalPlaceOfPerformance", {}).get("city", {}).get("name"),
+            "pop_state": self._code_name(core.get("principalPlaceOfPerformance", {}).get("state", {})),
+        }

@@ -3,6 +3,7 @@ import SearchFilters from './components/SearchFilters';
 import ResultsTable from './components/ResultsTable';
 import SpendingSummary from './components/SpendingSummary';
 import BookmarkedContracts from './components/BookmarkedContracts';
+import ContractDetail from './components/ContractDetail';
 import useBookmarks from './hooks/useBookmarks';
 import { searchAwards } from './api/client';
 import './App.css';
@@ -15,6 +16,7 @@ export default function App() {
   const [filters, setFilters] = useState({});
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('search');
+  const [selectedPiid, setSelectedPiid] = useState(null);
   const { bookmarks, toggle, isBookmarked, clear } = useBookmarks();
 
   const doSearch = useCallback(async (params, pg = 1) => {
@@ -82,6 +84,13 @@ export default function App() {
 
               {error && <div className="error">{error}</div>}
 
+              {selectedPiid && (
+                <ContractDetail
+                  piid={selectedPiid}
+                  onClose={() => setSelectedPiid(null)}
+                />
+              )}
+
               {results !== null && (
                 <ResultsTable
                   data={results}
@@ -90,6 +99,8 @@ export default function App() {
                   onPageChange={handlePageChange}
                   onToggleBookmark={toggle}
                   isBookmarked={isBookmarked}
+                  selectedPiid={selectedPiid}
+                  onSelectContract={(piid) => setSelectedPiid(piid === selectedPiid ? null : piid)}
                 />
               )}
 
@@ -103,11 +114,21 @@ export default function App() {
           )}
 
           {tab === 'bookmarks' && (
-            <BookmarkedContracts
-              bookmarks={bookmarks}
-              onToggleBookmark={toggle}
-              onClear={clear}
-            />
+            <>
+              {selectedPiid && (
+                <ContractDetail
+                  piid={selectedPiid}
+                  onClose={() => setSelectedPiid(null)}
+                />
+              )}
+              <BookmarkedContracts
+                bookmarks={bookmarks}
+                onToggleBookmark={toggle}
+                onClear={clear}
+                selectedPiid={selectedPiid}
+                onSelectContract={(piid) => setSelectedPiid(piid === selectedPiid ? null : piid)}
+              />
+            </>
           )}
         </main>
       </div>
