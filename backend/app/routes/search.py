@@ -43,14 +43,15 @@ def search_awards(
     else:
         psc_codes = ALL_PSCS
 
-    # Resolve set-aside
+    # Resolve set-aside to USASpending recipient_type_names
     set_aside_types = None
     if set_aside:
         mapping = {
-            "SDVOSB": ["small_disadvantaged_business"],
+            "SDVOSB": ["service_disabled_veterans_owned_business"],
             "8A": ["8a_program_participant"],
             "WOSB": ["women_owned_small_business"],
             "HUBZONE": ["historically_underutilized_business_zone"],
+            "SB": ["small_business", "other_than_small_business"],
         }
         set_aside_types = mapping.get(set_aside.upper())
 

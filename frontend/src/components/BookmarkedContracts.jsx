@@ -15,22 +15,20 @@ function daysUntil(dateStr) {
   return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
 }
 
-export default function ResultsTable({ data, hasNext, page, onPageChange, onToggleBookmark, isBookmarked }) {
-  if (!data) return null;
-
-  if (data.length === 0) {
-    return <div className="no-results">No contracts found matching your filters.</div>;
+export default function BookmarkedContracts({ bookmarks, onToggleBookmark, onClear }) {
+  if (bookmarks.length === 0) {
+    return (
+      <div className="no-results">
+        No bookmarked contracts yet. Click the star on any contract to save it here.
+      </div>
+    );
   }
 
   return (
     <div className="results">
       <div className="results-header">
-        <span>Showing {data.length} contracts{hasNext ? ' (more available)' : ''}</span>
-        <div className="pagination">
-          <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Prev</button>
-          <span>Page {page}</span>
-          <button disabled={!hasNext} onClick={() => onPageChange(page + 1)}>Next</button>
-        </div>
+        <span>{bookmarks.length} bookmarked contract{bookmarks.length !== 1 ? 's' : ''}</span>
+        <button className="secondary" onClick={onClear}>Clear All</button>
       </div>
 
       <div className="table-wrap">
@@ -50,19 +48,18 @@ export default function ResultsTable({ data, hasNext, page, onPageChange, onTogg
             </tr>
           </thead>
           <tbody>
-            {data.map((row, i) => {
+            {bookmarks.map((row, i) => {
               const days = daysUntil(row['End Date']);
               const expiring = days != null && days > 0 && days <= 180;
-              const saved = isBookmarked?.(row['Award ID']);
               return (
                 <tr key={row['Award ID'] || i} className={expiring ? 'expiring' : ''}>
                   <td>
                     <button
-                      className={`bookmark-btn ${saved ? 'bookmarked' : ''}`}
-                      onClick={() => onToggleBookmark?.(row)}
-                      title={saved ? 'Remove bookmark' : 'Bookmark this contract'}
+                      className="bookmark-btn bookmarked"
+                      onClick={() => onToggleBookmark(row)}
+                      title="Remove bookmark"
                     >
-                      {saved ? '\u2605' : '\u2606'}
+                      {'\u2605'}
                     </button>
                   </td>
                   <td className="recipient">{row['Recipient Name'] || '\u2014'}</td>

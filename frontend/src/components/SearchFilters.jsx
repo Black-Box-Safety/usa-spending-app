@@ -6,6 +6,7 @@ export default function SearchFilters({ onSearch, loading }) {
   const [agency, setAgency] = useState('');
   const [pscCategory, setPscCategory] = useState('');
   const [recipient, setRecipient] = useState('');
+  const [setAside, setSetAside] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -18,13 +19,14 @@ export default function SearchFilters({ onSearch, loading }) {
     const pscCodes = pscCategory && refData
       ? refData.psc_categories.find(c => c.category === pscCategory)?.codes.map(c => c.code).join(',')
       : '';
-    onSearch({ agency, psc: pscCodes, recipient, startDate, endDate });
+    onSearch({ agency, psc: pscCodes, recipient, setAside, startDate, endDate });
   }
 
   function handleReset() {
     setAgency('');
     setPscCategory('');
     setRecipient('');
+    setSetAside('');
     setStartDate('');
     setEndDate('');
     onSearch({});
@@ -64,6 +66,16 @@ export default function SearchFilters({ onSearch, loading }) {
           onChange={e => setRecipient(e.target.value)}
           placeholder="e.g. Grainger, Bound Tree..."
         />
+      </label>
+
+      <label>
+        Set-Aside Type
+        <select value={setAside} onChange={e => setSetAside(e.target.value)}>
+          <option value="">Any Set-Aside</option>
+          {refData?.set_aside_types.map(s => (
+            <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+          ))}
+        </select>
       </label>
 
       <label>

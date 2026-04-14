@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import SearchFilters from './components/SearchFilters';
 import ResultsTable from './components/ResultsTable';
 import SpendingSummary from './components/SpendingSummary';
+import BookmarkedContracts from './components/BookmarkedContracts';
+import useBookmarks from './hooks/useBookmarks';
 import { searchAwards } from './api/client';
 import './App.css';
 
@@ -12,6 +14,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({});
   const [error, setError] = useState(null);
+  const [tab, setTab] = useState('search');
+  const { bookmarks, toggle, isBookmarked, clear } = useBookmarks();
 
   const doSearch = useCallback(async (params, pg = 1) => {
     setLoading(true);
@@ -31,6 +35,7 @@ export default function App() {
   }, []);
 
   function handleSearch(params) {
+    setTab('search');
     doSearch(params, 1);
   }
 
@@ -41,34 +46,68 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>BBS Federal Spending Search</h1>
-        <p className="subtitle">Find who's buying what in Black Box Safety's target markets</p>
+        <div className="header-row">
+          <div>
+            <h1>BBS Federal Spending Search</h1>
+            <p className="subtitle">Find who's buying what in Black Box Safety's target markets</p>
+          </div>
+          <div className="tabs">
+            <button
+              className={`tab ${tab === 'search' ? 'active' : ''}`}
+              onClick={() => setTab('search')}
+            >
+              Search
+            </button>
+            <button
+              className={`tab ${tab === 'bookmarks' ? 'active' : ''}`}
+              onClick={() => setTab('bookmarks')}
+            >
+              Bookmarked ({bookmarks.length})
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="layout">
-        <aside>
-          <SearchFilters onSearch={handleSearch} loading={loading} />
-        </aside>
+        {tab === 'search' && (
+          <aside>
+            <SearchFilters onSearch={handleSearch} loading={loading} />
+          </aside>
+        )}
 
         <main>
-          <SpendingSummary filters={filters} />
+          {tab === 'search' && (
+            <>
+              <SpendingSummary filters={filters} />
 
-          {error && <div className="error">{error}</div>}
+              {error && <div className="error">{error}</div>}
 
-          {results !== null && (
-            <ResultsTable
-              data={results}
-              hasNext={hasNext}
-              page={page}
-              onPageChange={handlePageChange}
-            />
+              {results !== null && (
+                <ResultsTable
+                  data={results}
+                  hasNext={hasNext}
+                  page={page}
+                  onPageChange={handlePageChange}
+                  onToggleBookmark={toggle}
+                  isBookmarked={isBookmarked}
+                />
+              )}
+
+              {results === null && !loading && (
+                <div className="placeholder">
+                  <p>Select filters and click <strong>Search</strong> to find federal contracts in BBS product categories.</p>
+                  <p>All results are pre-filtered to BBS's target agencies and product codes (PSCs).</p>
+                </div>
+              )}
+            </>
           )}
 
-          {results === null && !loading && (
-            <div className="placeholder">
-              <p>Select filters and click <strong>Search</strong> to find federal contracts in BBS product categories.</p>
-              <p>All results are pre-filtered to BBS's target agencies and product codes (PSCs).</p>
-            </div>
+          {tab === 'bookmarks' && (
+            <BookmarkedContracts
+              bookmarks={bookmarks}
+              onToggleBookmark={toggle}
+              onClear={clear}
+            />
           )}
         </main>
       </div>
