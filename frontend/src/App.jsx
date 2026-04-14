@@ -48,8 +48,8 @@ export default function App() {
       <header>
         <div className="header-row">
           <div>
-            <h1>BBS Federal Spending Search</h1>
-            <p className="subtitle">Find who's buying what in Black Box Safety's target markets</p>
+            <h1>BLACK <span>BOX</span> SAFETY — Federal Spending</h1>
+            <p className="subtitle">Service-Disabled Veteran-Owned Small Business | Federal Contract Intelligence</p>
           </div>
           <div className="tabs">
             <button
