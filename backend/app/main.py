@@ -1,0 +1,24 @@
+"""FastAPI application for BBS Federal Spending Search."""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .routes import search, spending, reference
+
+app = FastAPI(title="BBS Spending Search", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite dev server
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(search.router)
+app.include_router(spending.router)
+app.include_router(reference.router)
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
