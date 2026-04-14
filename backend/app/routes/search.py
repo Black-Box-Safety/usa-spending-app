@@ -17,7 +17,7 @@ def search_awards(
     start_date: str | None = Query(None, description="Start date YYYY-MM-DD"),
     end_date: str | None = Query(None, description="End date YYYY-MM-DD"),
     set_aside: str | None = Query(None, description="Set-aside filter, e.g. SDVOSB"),
-    sort: str = Query("Award Amount", description="Sort field"),
+    sort: str = Query("Start Date", description="Sort field"),
     order: str = Query("desc", description="Sort order: asc or desc"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
